@@ -7,6 +7,7 @@
 	  <NoWarn>SKEXP0001</NoWarn>
 	  <UserSecretsId>34c9f77b-3416-42fc-90bc-2e0503b55215</UserSecretsId>
 	  <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+	  <DockerfileContext>.</DockerfileContext>
   </PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Markdig" Version="0.37.0" />

@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34902.65
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FoodHealthChecker", "FoodHealthChecker\FoodHealthChecker.csproj", "{E2623B67-5F1F-4D9F-AADD-E23C493DA5EB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FoodHealthChecker", "FoodHealthChecker.csproj", "{7BEAFE91-5A63-4430-8D43-D2D241FE19AB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +11,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{E2623B67-5F1F-4D9F-AADD-E23C493DA5EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E2623B67-5F1F-4D9F-AADD-E23C493DA5EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E2623B67-5F1F-4D9F-AADD-E23C493DA5EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E2623B67-5F1F-4D9F-AADD-E23C493DA5EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BEAFE91-5A63-4430-8D43-D2D241FE19AB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BEAFE91-5A63-4430-8D43-D2D241FE19AB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BEAFE91-5A63-4430-8D43-D2D241FE19AB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BEAFE91-5A63-4430-8D43-D2D241FE19AB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
