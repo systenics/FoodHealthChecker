@@ -115,11 +115,7 @@
         if (imageFile != null)
         {
             // Ensure the TempImages folder exists
-            var folderPath = Path.Combine("wwwroot", "TempImages");
-            if (!Directory.Exists(folderPath))
-            {
-                Directory.CreateDirectory(folderPath);
-            }
+            var folderPath = Path.Combine("wwwroot", "temp");
 
             // Save the file to the server
             var filePath = Path.Combine(folderPath, imageFile.Name);

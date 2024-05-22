@@ -21,5 +21,6 @@ RUN dotnet publish "./FoodHealthChecker.csproj" -c $BUILD_CONFIGURATION -o /app/
 
 FROM base AS final
 WORKDIR /app
+RUN mkdir -p /app/wwwroot/temp
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "FoodHealthChecker.dll"]
