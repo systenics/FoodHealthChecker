@@ -22,13 +22,13 @@
                     <h4 class="card-title fw-bold required text-start">Image</h4>
                     <div class="form-group mb-3">
                         <!-- HTML -->
-                        <label for="upload-image" class="custom-upload-button btn btn-primary">
+                        <label for="upload-image" class="custom-upload-button btn btn-primary @isUploadingImage">
                             Upload Image
                         </label>
-                        <InputFile OnChange="HandleSelectedFiles" class="btn btn-primary" id="upload-image" aria-describedby="fileHelp" multiple></InputFile>
+                        <InputFile OnChange="HandleSelectedFiles" accept=".jpg,.png" class="btn btn-primary" id="upload-image" aria-describedby="fileHelp"></InputFile>
                     </div>
                     <div class="form-group mb-3">
-                        <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse && isProcessingIngredients)">Check Health</button>
+                        <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse || isProcessingIngredients)">Check Health</button>
                     </div>
 
                     @if (!string.IsNullOrWhiteSpace(ImageUrl))
@@ -105,13 +105,16 @@
 
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;
+    private string isUploadingImage = string.Empty;
     private string errorMessage = string.Empty;
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
 
     private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
     {
+        isUploadingImage = "disabled";
         var imageFile = e.File;
+        await InvokeAsync(() => this.StateHasChanged());
         if (imageFile != null)
         {
             // Ensure the TempImages folder exists
@@ -126,9 +129,12 @@
             ImageData = await ReadFileBytes(imageFile);
             ImageName = imageFile.Name;
             // Update the ImageUrl property with the complete URL
-            var relativePath = Path.Combine("TempImages", imageFile.Name);
+            var relativePath = Path.Combine("temp", imageFile.Name);
             ImageUrl = Navigation.ToAbsoluteUri(relativePath).ToString();
         }
+        isUploadingImage = string.Empty;
+        await InvokeAsync(() => this.StateHasChanged());
+
     }
 
     private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
@@ -141,6 +147,7 @@
     private async Task CheckHealth()
     {
         isProcessingIngredients = true;
+        isProcessingResponse = true;
         errorMessage = string.Empty;
         Result = string.Empty;
         Ingredients = string.Empty;
@@ -170,8 +177,6 @@
                 {
                     Ingredients = Ingredients.Replace("<|ERROR|>", "Not Found");
                 }
-
-                isProcessingResponse = true;
                 await InvokeAsync(() => this.StateHasChanged());
 
                 await foreach (var response in _foodCheckerService.CheckFoodHealthAsync(Ingredients, _cts.Token))

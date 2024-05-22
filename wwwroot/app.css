@@ -136,7 +136,7 @@ h1, h2, h3, h4, h5, h6 {
     border-color: #00796B;
 }
 
-    .btn-primary:hover, .btn-primary:active, .btn-primary:focus, .btn-primary:disabled {
+    .btn-primary:hover, .btn-primary:active, .btn-primary:focus, .btn-primary:disabled, .btn-primary.disabled {
         background-color: #00796B;
         border-color: #004D40;
     }
@@ -169,7 +169,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .ai-response {
-    height: 150px;
+    height: 200px;
     overflow-y: auto;
     scrollbar-width: thin;
     -ms-overflow-style: none;
