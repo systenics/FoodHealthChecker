@@ -5,7 +5,6 @@
 @using Microsoft.AspNetCore.Components
 @using System.Runtime.CompilerServices
 @implements IDisposable
-
 <PageTitle> Food Health Checker</PageTitle>
 
 <div class="container mt-2">
@@ -20,12 +19,16 @@
         <div class="col-xl-4">
             <div class="card common-card-height">
                 <div class="card-body">
-                    <h4 class="card-title fw-bold required text-start">Image URL</h4>
+                    <h4 class="card-title fw-bold required text-start">Image</h4>
                     <div class="form-group mb-3">
-                        <InputText class="form-control" @bind-Value="ImageUrl" id="imageUrl" placeholder="Enter the food package image URL" />
+                        <!-- HTML -->
+                        <label for="upload-image" class="custom-upload-button btn btn-primary">
+                            Upload Image
+                        </label>
+                        <InputFile OnChange="HandleSelectedFiles" class="btn btn-primary" id="upload-image" aria-describedby="fileHelp" multiple></InputFile>
                     </div>
                     <div class="form-group mb-3">
-                        <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse || isProcessingIngredients)">Check Health</button>
+                        <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse && isProcessingIngredients)">Check Health</button>
                     </div>
 
                     @if (!string.IsNullOrWhiteSpace(ImageUrl))
@@ -87,22 +90,60 @@
 
 @code {
     public string ImageUrl { get; set; } = string.Empty;
+    public ReadOnlyMemory<byte> ImageData { get; set; }
+    public string ImageName { get; set; } = string.Empty;
+
     public string Ingredients { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
-    
+
     [Inject]
-    public MarkdownPipeline pipeline { get; set; }
+    public MarkdownPipeline pipeline { get; set; } = default!;
     [Inject]
-    public FoodCheckerService _foodCheckerService { get; set; }
+    public FoodCheckerService _foodCheckerService { get; set; } = default!;
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
 
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;
     private string errorMessage = string.Empty;
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
+
+    private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
+    {
+        var imageFile = e.File;
+        if (imageFile != null)
+        {
+            // Ensure the TempImages folder exists
+            var folderPath = Path.Combine("wwwroot", "TempImages");
+            if (!Directory.Exists(folderPath))
+            {
+                Directory.CreateDirectory(folderPath);
+            }
+
+            // Save the file to the server
+            var filePath = Path.Combine(folderPath, imageFile.Name);
+            using var stream = new FileStream(filePath, FileMode.Create);
+            await imageFile.OpenReadStream().CopyToAsync(stream);
+
+            // Read the file into a byte array
+            ImageData = await ReadFileBytes(imageFile);
+            ImageName = imageFile.Name;
+            // Update the ImageUrl property with the complete URL
+            var relativePath = Path.Combine("TempImages", imageFile.Name);
+            ImageUrl = Navigation.ToAbsoluteUri(relativePath).ToString();
+        }
+    }
+
+    private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
+    {
+        using var memoryStream = new MemoryStream();
+        await imageFile.OpenReadStream().CopyToAsync(memoryStream);
+        return memoryStream.ToArray();
+    }
+
     private async Task CheckHealth()
     {
-
         isProcessingIngredients = true;
         errorMessage = string.Empty;
         Result = string.Empty;

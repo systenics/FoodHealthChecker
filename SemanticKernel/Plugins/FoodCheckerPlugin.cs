@@ -47,7 +47,7 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
             {
                 new TextContent(FoodCheckerTemplates.GetIngredients),
                 new ImageContent(new Uri(input))
-            });
+            }); 
             await foreach (var result in chatService.GetStreamingChatMessageContentsAsync(chat, s_settings, kernel, cancellationToken))
             {
                 var generatedText = result?.ToString() ?? string.Empty;
@@ -63,7 +63,8 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
         public const string CheckFoodHealth =
 @"
 [Instruction]    
-Given the list of ingredients for a food product give it a Rating from Very Unhealthy to very Healthy. Also give the reasoning in ELI5 format using less than 3 sentences in the below response format
+Given the list of ingredients for a food product give it a Rating from Very Unhealthy to very Healthy. Also give the reasoning in ELI5 format using less than 3 sentences in the below response format. 
+Also list any cancer causing or harmful substances if present.
 [Ingredients]
 {{$input}}
 [RESPONSE]

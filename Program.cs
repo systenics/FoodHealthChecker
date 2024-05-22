@@ -19,7 +19,7 @@ namespace FoodHealthChecker
             });
             builder.Services.AddAntiforgery(o => o.SuppressXFrameOptionsHeader = true);
             builder.Services.AddSingleton<FoodCheckerPlugin>();
-            builder.Services.AddSingleton<FoodCheckerService>();
+            builder.Services.AddTransient<FoodCheckerService>();
 
             var app = builder.Build();
 
