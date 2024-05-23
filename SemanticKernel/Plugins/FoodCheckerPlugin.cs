@@ -46,7 +46,7 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
             chat.AddUserMessage(new ChatMessageContentItemCollection
             {
                 new TextContent(FoodCheckerTemplates.GetIngredients),
-                new ImageContent(new Uri(input))
+                new ImageContent(new Uri(input,UriKind.Absolute))
             }); 
             await foreach (var result in chatService.GetStreamingChatMessageContentsAsync(chat, s_settings, kernel, cancellationToken))
             {
@@ -58,7 +58,7 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
     }
     public static class FoodCheckerTemplates
     {
-        public const string SystemMessage = @"You are a AI Food expert";
+        public const string SystemMessage = @"You are an AI Food expert with extensive knowledge in Nutrion";
 
         public const string CheckFoodHealth =
 @"
@@ -70,6 +70,7 @@ Also list any cancer causing or harmful substances if present.
 [RESPONSE]
 **Predicted Rating**
 **Reasoning**
+**Harmful substances**
 ";
 
         public const string GetIngredients =

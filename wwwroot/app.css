@@ -108,7 +108,9 @@ h4 {
 .container {
     background-color: #E0F2F1;
 }
-
+.modal-header {
+    background-color: #E0F2F1;
+}
 h1, h2, h3, h4, h5, h6 {
     color: #00695C;
 }

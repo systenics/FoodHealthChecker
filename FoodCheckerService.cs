@@ -1,5 +1,5 @@
-﻿using FoodHealthChecker.Options;
-using FoodHealthChecker.SemanticKernel.Filters;
+﻿using FoodHealthChecker.Models;
+using FoodHealthChecker.Options;
 using FoodHealthChecker.SemanticKernel.Plugins;
 using Microsoft.SemanticKernel;
 
@@ -7,7 +7,7 @@ namespace FoodHealthChecker
 {
     public class FoodCheckerService
     {
-        private readonly Kernel _kernel;
+        private  Kernel _kernel;
         private bool isValid = false;
         private readonly FoodCheckerPlugin _foodCheckerPlugin;
         public FoodCheckerService(IConfiguration config, FoodCheckerPlugin foodCheckerPlugin)
@@ -36,6 +36,24 @@ namespace FoodHealthChecker
             _kernel = kernel;
         }
 
+        public void UpdateTemporaryKernel(TemporaryConfig config)
+        {
+            var kernelBuilder = Kernel.CreateBuilder();
+
+            if (config.isAzureOpenAIConfigValid())
+            {
+                kernelBuilder.AddAzureOpenAIChatCompletion(config.AzureOpenAI_DeploymentName, config.AzureOpenAI_Endpoint, config.AzureOpenAI_ApiKey);
+                isValid = true;
+            }
+            else if (config.isOpenAIConfigValid())
+            {
+                kernelBuilder.AddOpenAIChatCompletion(config.OpenAI_ModelId,config.OpenAI_ApiKey);
+                isValid = true;
+            }
+            var kernel = kernelBuilder.Build();
+            kernel.Plugins.AddFromObject(_foodCheckerPlugin);
+            _kernel = kernel;
+        }
         public bool IsValid()
         {
             return isValid;

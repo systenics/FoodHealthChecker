@@ -1,16 +1,76 @@
 ﻿@page "/"
 @using FoodHealthChecker.Components.Layout
 @using FoodHealthChecker
+@using FoodHealthChecker.Models
 @using Markdig
 @using Microsoft.AspNetCore.Components
 @using System.Runtime.CompilerServices
+@using System.Text.Json
+@using Microsoft.SemanticKernel
+@rendermode InteractiveServer
+
 @implements IDisposable
 <PageTitle> Food Health Checker</PageTitle>
+@{
+    var showClass = isPopupVisible ? "d-block" : "d-none";
+}
 
 <div class="container mt-2">
-    <div style="display: flex; justify-content: space-between; ">
-        <h3 class="card-title mb-2 fw-bold">AI Food Health Checker</h3>
-        <a class="card-title mb-2 fw-bold btn btn-dark" href="@duplicateSpace" target="_blank">Duplicate this space</a>
+    <div class="d-flex justify-content-between gap-2">
+        <h3 class="card-title mb-2 fw-bold text-start">AI Food Health Checker</h3>
+        <div>
+            <a class="card-title mb-2 fw-bold btn btn-dark" href="@duplicateSpace" target="_blank">Duplicate this space</a>
+            <button @onclick="OpenModal" class="card-title mb-2 fw-bold btn btn-dark">Add Temporary Config</button>
+        </div>
+    </div>
+
+    <!-- temporaryConfig Modal -->
+    <div class="modal @showClass" tabindex="-1" role="dialog" id="temporaryConfigModal">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Add Temporary Config (Any one)</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@temporaryConfig" OnSubmit="SubmitForm" FormName="Configs">
+                        <div class="form-section">
+                            <h5 class="fw-bold">Azure OpenAI</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="AzureOpenAI_DeploymentName" class="form-label">Deployment Name</label>
+                                    <InputText class="form-control" id="AzureOpenAI_DeploymentName" @bind-Value="temporaryConfig.AzureOpenAI_DeploymentName" placeholder="Enter Deployment Name" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="AzureOpenAI_Endpoint" class="form-label">Endpoint</label>
+                                    <InputText class="form-control" id="AzureOpenAI_Endpoint" @bind-Value="temporaryConfig.AzureOpenAI_Endpoint" placeholder="Enter Endpoint" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="AzureOpenAI_ApiKey" class="form-label">API Key</label>
+                                    <InputText type="password" class="form-control" id="AzureOpenAI_ApiKey" @bind-Value="temporaryConfig.AzureOpenAI_ApiKey" placeholder="Enter API Key" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h5 class="fw-bold">OpenAI</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="OpenAI_ModelId" class="form-label">Model ID</label>
+                                    <InputText class="form-control" id="OpenAI_ModelId" @bind-Value="temporaryConfig.OpenAI_ModelId" placeholder="Enter Model ID" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="OpenAI_ApiKey" class="form-label">API Key</label>
+                                    <InputText class="form-control" type="password" id="OpenAI_ApiKey" @bind-Value="temporaryConfig.OpenAI_ApiKey" placeholder="Enter API Key" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row justify-content-center ">
@@ -39,6 +99,13 @@
                     {
                         <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px;" />
                     }
+                    else if (!string.IsNullOrWhiteSpace(isUploadingImage))
+                    {
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -50,7 +117,6 @@
                     {
                         <div class="d-flex justify-content-center">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
                     }
@@ -73,7 +139,6 @@
                     {
                         <div class="d-flex justify-content-center">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
                     }
@@ -93,13 +158,15 @@
 </div>
 
 @code {
+    public TemporaryConfig temporaryConfig { get; set; } = new TemporaryConfig();
+    private bool isPopupVisible = false;
     public string ImageUrl { get; set; } = string.Empty;
     public ReadOnlyMemory<byte> ImageData { get; set; }
     public string ImageName { get; set; } = string.Empty;
 
     public string Ingredients { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
-    public string duplicateSpace  { get; set; } = string.Empty;
+    public string duplicateSpace { get; set; } = string.Empty;
 
     [Inject]
     public MarkdownPipeline pipeline { get; set; } = default!;
@@ -110,24 +177,60 @@
     [Inject]
     private IConfiguration Config { get; set; } = default;
 
-    protected override void OnInitialized()
-    {
-        duplicateSpace = Config.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
-        if (!_foodCheckerService.IsValid())
-        {
-            errorMessage = "API keys missing. Duplicate this space to add missing keys";
-        }
-    }
-
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;
     private string isUploadingImage = string.Empty;
     private string errorMessage = string.Empty;
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
+    private async Task OpenModal()
+    {
+        isPopupVisible = true;
+        StateHasChanged();
+    }
+
+    private async Task CloseModal()
+    {
+        isPopupVisible = false;
+        StateHasChanged();
+    }
+
+    private async Task SubmitForm()
+    {
+        try
+        {
+            if (!(temporaryConfig.isAzureOpenAIConfigValid() || temporaryConfig.isOpenAIConfigValid()))
+            {
+                errorMessage = "Invalid Config";
+            }
+            else
+            {
+                errorMessage = string.Empty;
+                _foodCheckerService.UpdateTemporaryKernel(temporaryConfig);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Unexpected Error occured";
+        }
+        await CloseModal();
+    }
+
+
+    protected override void OnInitialized()
+    {
+        duplicateSpace = Config.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
+        if (!_foodCheckerService.IsValid())
+        {
+            errorMessage = "API keys missing from config";
+        }
+    }
+
 
     private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
     {
+        ImageUrl = string.Empty;
+        errorMessage = string.Empty;
         isUploadingImage = "disabled";
         var imageFile = e.File;
         await InvokeAsync(() => this.StateHasChanged());
@@ -150,7 +253,6 @@
         }
         isUploadingImage = string.Empty;
         await InvokeAsync(() => this.StateHasChanged());
-
     }
 
     private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
@@ -167,10 +269,13 @@
         errorMessage = string.Empty;
         Result = string.Empty;
         Ingredients = string.Empty;
+        await InvokeAsync(() => this.StateHasChanged());
+
         if (!Uri.IsWellFormedUriString(ImageUrl, UriKind.Absolute))
         {
             errorMessage = "Invalid URL";
             isProcessingIngredients = false;
+            isProcessingResponse = false;
             await InvokeAsync(() => this.StateHasChanged());
             return;
         }
@@ -203,10 +308,25 @@
                 }
             }
         }
+        catch (HttpOperationException hEx)
+        {
+            if (hEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                errorMessage = "Rate Limit Exceeded. Please try again Later";
+            }
+            else if (hEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                using JsonDocument doc = JsonDocument.Parse(hEx.ResponseContent);
+                JsonElement root = doc.RootElement;
+                string message = root.GetProperty("error").GetProperty("message").GetString();
+                Console.WriteLine(message);
+                errorMessage = message;
+            }
+        }
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
-            errorMessage = $"Error: An unexpected error has occurred";
+            errorMessage = "Error: An unexpected error has occurred";
         }
         finally
         {
