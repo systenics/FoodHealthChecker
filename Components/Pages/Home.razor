@@ -8,7 +8,11 @@
 <PageTitle> Food Health Checker</PageTitle>
 
 <div class="container mt-2">
-    <h3 class="card-title mb-2 fw-bold">AI Food Health Checker</h3>
+    <div style="display: flex; justify-content: space-between; ">
+        <h3 class="card-title mb-2 fw-bold">AI Food Health Checker</h3>
+        <a class="card-title mb-2 fw-bold btn btn-dark" href="@duplicateSpace" target="_blank">Duplicate this space</a>
+    </div>
+
     <div class="row justify-content-center ">
         <div class="col-xl-12">
             @if (!string.IsNullOrEmpty(errorMessage))
@@ -95,6 +99,7 @@
 
     public string Ingredients { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
+    public string duplicateSpace  { get; set; } = string.Empty;
 
     [Inject]
     public MarkdownPipeline pipeline { get; set; } = default!;
@@ -102,6 +107,17 @@
     public FoodCheckerService _foodCheckerService { get; set; } = default!;
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
+    [Inject]
+    private IConfiguration Config { get; set; } = default;
+
+    protected override void OnInitialized()
+    {
+        duplicateSpace = Config.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
+        if (!_foodCheckerService.IsValid())
+        {
+            errorMessage = "API keys missing. Duplicate this space to add missing keys";
+        }
+    }
 
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;

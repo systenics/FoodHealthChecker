@@ -8,6 +8,7 @@ namespace FoodHealthChecker
     public class FoodCheckerService
     {
         private readonly Kernel _kernel;
+        private bool isValid = false;
         private readonly FoodCheckerPlugin _foodCheckerPlugin;
         public FoodCheckerService(IConfiguration config, FoodCheckerPlugin foodCheckerPlugin)
         {
@@ -20,14 +21,12 @@ namespace FoodHealthChecker
             if (azureOptions != null && azureOptions.isValid())
             {
                 kernelBuilder.AddAzureOpenAIChatCompletion(azureOptions.DeploymentName, azureOptions.Endpoint, azureOptions.ApiKey);
+                isValid = true;
             }
             else if (oaiOptions != null && oaiOptions.isValid())
             {
                 kernelBuilder.AddOpenAIChatCompletion(oaiOptions.ModelID, oaiOptions.ApiKey);
-            }
-            else
-            {
-                throw new ArgumentException("Missing AI service configuration");
+                isValid = true;
             }
             var kernel = kernelBuilder.Build();
             //TODO - implement
@@ -37,6 +36,10 @@ namespace FoodHealthChecker
             _kernel = kernel;
         }
 
+        public bool IsValid()
+        {
+            return isValid;
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -58,7 +61,7 @@ namespace FoodHealthChecker
         /// <returns></returns>
         /// Inconsistant behaviour https://github.com/microsoft/semantic-kernel/pull/6319
         /// Related to https://github.com/dotnet/runtime/issues/96544
-        public IAsyncEnumerable<string> GetIngredirentsAsync(ReadOnlyMemory<byte> imageData,string fileName, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<string> GetIngredirentsAsync(ReadOnlyMemory<byte> imageData, string fileName, CancellationToken cancellationToken = default)
         {
 
             var imageDataUrl = new ImageContent(imageData) { MimeType = GetMimeType(fileName) }.ToString();
@@ -72,7 +75,7 @@ namespace FoodHealthChecker
         /// <param name="imageUrl"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public IAsyncEnumerable<string> GetIngredirentsAsync(string imageUrl,CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<string> GetIngredirentsAsync(string imageUrl, CancellationToken cancellationToken = default)
         {
             return _foodCheckerPlugin.GetIngredientsAsync(imageUrl, _kernel, cancellationToken);
         }
