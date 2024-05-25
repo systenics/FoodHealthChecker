@@ -47,7 +47,7 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
             {
                 new TextContent(FoodCheckerTemplates.GetIngredients),
                 new ImageContent(new Uri(input,UriKind.Absolute))
-            }); 
+            });
             await foreach (var result in chatService.GetStreamingChatMessageContentsAsync(chat, s_settings, kernel, cancellationToken))
             {
                 var generatedText = result?.ToString() ?? string.Empty;

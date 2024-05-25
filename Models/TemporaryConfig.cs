@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.DataProtection.KeyManagement;
-
-namespace FoodHealthChecker.Models
+﻿namespace FoodHealthChecker.Models
 {
 
     public class TemporaryConfig

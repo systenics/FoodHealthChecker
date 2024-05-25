@@ -7,7 +7,7 @@ namespace FoodHealthChecker
 {
     public class FoodCheckerService
     {
-        private  Kernel _kernel;
+        private Kernel _kernel;
         private bool isValid = false;
         private readonly FoodCheckerPlugin _foodCheckerPlugin;
         public FoodCheckerService(IConfiguration config, FoodCheckerPlugin foodCheckerPlugin)
@@ -29,9 +29,7 @@ namespace FoodHealthChecker
                 isValid = true;
             }
             var kernel = kernelBuilder.Build();
-            //TODO - implement
-            //kernel.PromptRenderFilters.Add(new FoodCheckPromptRenderFilter());
-            //kernel.FunctionInvocationFilters.Add(new FoodCheckFunctionFilter());
+
             kernel.Plugins.AddFromObject(foodCheckerPlugin);
             _kernel = kernel;
         }
@@ -47,7 +45,7 @@ namespace FoodHealthChecker
             }
             else if (config.isOpenAIConfigValid())
             {
-                kernelBuilder.AddOpenAIChatCompletion(config.OpenAI_ModelId,config.OpenAI_ApiKey);
+                kernelBuilder.AddOpenAIChatCompletion(config.OpenAI_ModelId, config.OpenAI_ApiKey);
                 isValid = true;
             }
             var kernel = kernelBuilder.Build();

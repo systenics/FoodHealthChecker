@@ -19,7 +19,10 @@
     <div class="d-flex justify-content-between gap-2">
         <h3 class="card-title mb-2 fw-bold text-start">AI Food Health Checker</h3>
         <div>
-            <a class="card-title mb-2 fw-bold btn btn-dark" href="@duplicateSpace" target="_blank">Duplicate this space</a>
+            @if (!string.IsNullOrEmpty(duplicateSpace))
+            {
+                <a class="card-title mb-2 fw-bold btn btn-dark me-2" href="@duplicateSpace" target="_blank">Duplicate this space</a>
+            }
             <button @onclick="OpenModal" class="card-title mb-2 fw-bold btn btn-dark">Add Temporary Config</button>
         </div>
     </div>
@@ -83,7 +86,11 @@
         <div class="col-xl-4">
             <div class="card common-card-height">
                 <div class="card-body">
-                    <h4 class="card-title fw-bold required text-start">Image</h4>
+                    <h4 class="card-title fw-bold  text-start">Add/Upload Image </h4>
+                    <div class="form-group mb-3">
+                        <InputText class="form-control" @bind-Value="HostedImageUrl" id="hostedimageUrl" placeholder="Hosted Image URL" />
+                    </div>
+
                     <div class="form-group mb-3">
                         <!-- HTML -->
                         <label for="upload-image" class="custom-upload-button btn btn-primary @isUploadingImage">
@@ -95,7 +102,11 @@
                         <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse || isProcessingIngredients)">Check Health</button>
                     </div>
 
-                    @if (!string.IsNullOrWhiteSpace(ImageUrl))
+                    @if (!string.IsNullOrWhiteSpace(HostedImageUrl))
+                    {
+                        <img src="@HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px;" />
+                    }
+                    else if (!string.IsNullOrWhiteSpace(ImageUrl))
                     {
                         <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px;" />
                     }
@@ -159,14 +170,13 @@
 
 @code {
     public TemporaryConfig temporaryConfig { get; set; } = new TemporaryConfig();
-    private bool isPopupVisible = false;
+
+    public string HostedImageUrl { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public ReadOnlyMemory<byte> ImageData { get; set; }
     public string ImageName { get; set; } = string.Empty;
-
     public string Ingredients { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
-    public string duplicateSpace { get; set; } = string.Empty;
 
     [Inject]
     public MarkdownPipeline pipeline { get; set; } = default!;
@@ -175,24 +185,26 @@
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
     [Inject]
-    private IConfiguration Config { get; set; } = default;
+    private IConfiguration Config { get; set; } = default!;
 
+    private bool isPopupVisible = false;
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;
     private string isUploadingImage = string.Empty;
     private string errorMessage = string.Empty;
+    private string duplicateSpace = string.Empty;
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
     private async Task OpenModal()
     {
         isPopupVisible = true;
-        StateHasChanged();
+        await InvokeAsync(() => this.StateHasChanged());
     }
 
     private async Task CloseModal()
     {
         isPopupVisible = false;
-        StateHasChanged();
+        await InvokeAsync(() => this.StateHasChanged());
     }
 
     private async Task SubmitForm()
@@ -236,17 +248,30 @@
         await InvokeAsync(() => this.StateHasChanged());
         if (imageFile != null)
         {
-            // Ensure the TempImages folder exists
+            // Ensure the TempImages folder exists and is empty
             var folderPath = Path.Combine("wwwroot", "temp");
+            if (Directory.Exists(folderPath))
+            {
+                // Delete existing images 
+                Array.ForEach(Directory.GetFiles(folderPath), File.Delete);
+            }
+            else
+            {
+                // Create the directory if it does not exist
+                Directory.CreateDirectory(folderPath);
+            }
 
             // Save the file to the server
             var filePath = Path.Combine(folderPath, imageFile.Name);
-            using var stream = new FileStream(filePath, FileMode.Create);
-            await imageFile.OpenReadStream().CopyToAsync(stream);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await imageFile.OpenReadStream().CopyToAsync(stream);
+            }
 
             // Read the file into a byte array
             ImageData = await ReadFileBytes(imageFile);
             ImageName = imageFile.Name;
+
             // Update the ImageUrl property with the complete URL
             var relativePath = Path.Combine("temp", imageFile.Name);
             ImageUrl = Navigation.ToAbsoluteUri(relativePath).ToString();
@@ -264,6 +289,11 @@
 
     private async Task CheckHealth()
     {
+        if (!_foodCheckerService.IsValid())
+        {
+            errorMessage = "API keys missing from config";
+            return;
+        }
         isProcessingIngredients = true;
         isProcessingResponse = true;
         errorMessage = string.Empty;
@@ -281,7 +311,8 @@
         }
         try
         {
-            await foreach (var response in _foodCheckerService.GetIngredirentsAsync(ImageUrl, _cts.Token))
+            string selectedImgUrl = !string.IsNullOrWhiteSpace(HostedImageUrl) ? HostedImageUrl : ImageUrl;
+            await foreach (var response in _foodCheckerService.GetIngredirentsAsync(selectedImgUrl, _cts.Token))
             {
                 isProcessingIngredients = false;
                 Ingredients += response;
