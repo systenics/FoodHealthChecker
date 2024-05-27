@@ -178,7 +178,7 @@
                             <tr>
                                 <th>Names</th>
                                 <th>Images</th>
-                                <th>See Results</th>
+                                <th>Results</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -188,7 +188,7 @@
                                     <td><a href="@example.HostedImageUrl" target="_blank">@example.Name </a></td>
                                     <td><img src="@example.HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px; max-width: 150px" /></td>
                                     <td>
-                                        <button class="btn btn-primary" @onclick="() => { UpdateExample(example.Name); ScrollToTop(); }">
+                                        <button class="btn btn-primary" @onclick="async () => {await UpdateExample(example.Name); ScrollToTop(); }">
                                             See Results
                                         </button>
                                     </td>
