@@ -1,16 +1,5 @@
 /* layout-related.css */
 
-/* Reset some default styles */
- body {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    height: 100vh;
-}
-
-    
 /* Center the form */
 .container {
     padding: 15px;
@@ -171,10 +160,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .ai-response {
-    height: 200px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    -ms-overflow-style: none;
+    min-height: 200px;
+    height: fit-content;
+    height: -moz-max-content;
 }
 
     .ai-response::-webkit-scrollbar,
@@ -192,3 +180,18 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     z-index: -1;
 }
+.custom-table {
+    color: #00695C;
+}
+
+    .custom-table th {
+        color: #004D40;
+    }
+
+    .custom-table a {
+        color: #009688;
+    }
+
+    .custom-table img {
+        border: 1px solid #26A69A;
+    }

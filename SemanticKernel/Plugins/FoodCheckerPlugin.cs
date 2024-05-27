@@ -64,7 +64,7 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
 @"
 [Instruction]    
 Given the list of ingredients for a food product give it a Rating from Very Unhealthy to very Healthy. Also give the reasoning in ELI5 format using less than 3 sentences in the below response format. 
-Also list any cancer causing or harmful substances if present.
+Also list any allergens, cancer causing or harmful substances if present along with exact reason.
 [Ingredients]
 {{$input}}
 [RESPONSE]
@@ -76,7 +76,7 @@ Also list any cancer causing or harmful substances if present.
         public const string GetIngredients =
 @"
 [Instruction]    
-Get the ingredients and nutritional values from the given food product images as briefly as possible in the given format else respond with <|ERROR|> if nothing if found
+Get the ingredients and nutritional values in english from the given food product images as briefly as possible in the given format else respond with <|ERROR|> if nothing if found
 [RESPONSE]
 **Ingredients**
 **Nutritional Values**";

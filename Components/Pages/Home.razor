@@ -8,6 +8,8 @@
 @using System.Text.Json
 @using Microsoft.SemanticKernel
 @rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
 
 @implements IDisposable
 <PageTitle> Food Health Checker</PageTitle>
@@ -104,11 +106,11 @@
 
                     @if (!string.IsNullOrWhiteSpace(HostedImageUrl))
                     {
-                        <img src="@HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px;" />
+                        <img src="@HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
                     }
                     else if (!string.IsNullOrWhiteSpace(ImageUrl))
                     {
-                        <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px;" />
+                        <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
                     }
                     else if (!string.IsNullOrWhiteSpace(isUploadingImage))
                     {
@@ -166,9 +168,95 @@
             </div>
         </div>
     </div>
+    <div class="row mt-2">
+        <div class="col-xl-12">
+            <div class="card">
+                <div class="card-body overflow-auto">
+                    <h3 class="fw-bold text-start">Examples</h3>
+                    <table class="table custom-table">
+                        <thead>
+                            <tr>
+                                <th>Names</th>
+                                <th>Images</th>
+                                <th>See Results</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var example in Examples)
+                            {
+                                <tr>
+                                    <td><a href="@example.HostedImageUrl" target="_blank">@example.Name </a></td>
+                                    <td><img src="@example.HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px; max-width: 150px" /></td>
+                                    <td>
+                                        <button class="btn btn-primary" @onclick="() => { UpdateExample(example.Name); ScrollToTop(); }">
+                                            See Results
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-
+<script>
+    function scrollToTop() {
+        document.documentElement.scrollTop = 0;
+    }
+</script>
 @code {
+    public class ExamplesInfo
+    {
+        public string Name { get; set; }
+        public string HostedImageUrl { get; set; }
+        public string Ingredients { get; set; }
+        public string Result { get; set; }
+    }
+
+    public List<ExamplesInfo> Examples = new List<ExamplesInfo>()
+    {
+        new ExamplesInfo { Name = "Milk chocolate", HostedImageUrl = "https://images.openfoodfacts.org/images/products/762/220/173/0253/ingredients_en.5.full.jpg",
+            Ingredients ="**Ingredients**\nMilk Chocolate (Sugar, Milk Solids, Cocoa Butter, Cocoa Mass, Emulsifiers (Soy Lecithin, E476), Flavourings)\n\n**Nutritional Values**\n- Serving Size: 1 bar (approx. 21g)\n- Energy: 110 kcal\n- Protein: 1.3g\n- Carbohydrates: 12.7g\n  - Sugars: 12.5g\n- Fat: 6.1g\n  - Saturated Fat: 3.7g\n- Fiber: 0.2g\n- Sodium: 20mg",
+            Result = "**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product is high in sugar and saturated fat, which can contribute to weight gain and heart problems if consumed in large amounts. It also has very little fiber and protein, making it less nutritious overall.\n\n**Harmful substances**\n- **Sugar**: High sugar content can lead to tooth decay, obesity, and increased risk of type 2 diabetes.\n- **Saturated Fat**: High levels of saturated fat can raise cholesterol levels and increase the risk of heart disease.\n- **Soy Lecithin**: Common allergen for those with soy allergies." },
+
+
+        new ExamplesInfo { Name = "Bacon", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/048/607/8035/ingredients_es.29.full.jpg",
+            Ingredients = "**Ingredients**\nMechanically separated chicken meat, pork fat, water, salt, dextrose, stabilizers (E-466, E-508, E-450), flavors and spices, smoke flavor, antioxidant (E-316), preservative (E-250). May contain traces of soy and milk protein.\n\n**Nutritional Values**\nNot Found",
+            Result ="**Predicted Rating**\nVery Unhealthy\n\n**Reasoning**\nThis product contains high amounts of processed meats, fats, and additives like preservatives and stabilizers, which are not good for your health if consumed regularly. It also lacks any nutritional information, making it hard to assess its overall health benefits.\n\n**Harmful substances**\n- E-250 (Sodium Nitrite): Can form cancer-causing compounds called nitrosamines.\n- Mechanically separated meat: Often contains higher levels of fat and may have bone fragments.\n- May contain traces of soy and milk protein: Common allergens." },
+
+        new ExamplesInfo { Name = "High Protein Chicken & Chorizo Paella", HostedImageUrl = "https://images.openfoodfacts.org/images/products/505/590/422/3289/front_en.3.full.jpg",
+            Ingredients ="**Ingredients**\nChicken breast and chorizo pieces in a rich paella sauce with rice, garden peas, semi dried cherry tomatoes and diced red peppers.\n\n**Nutritional Values**\nEnergy: 1919 kJ / 460 kcal\nFat: 20.19g\nSaturated Fat: 4.2g\nSugar: 6.8g\nSalt: 1.799g",
+            Result = "**Predicted Rating**\nModerately Healthy\n\n**Reasoning**\nThis dish contains a good mix of protein from chicken breast and chorizo, along with vegetables like peas, tomatoes, and peppers. However, it has a relatively high fat content, especially saturated fat, and a significant amount of salt, which can be concerning if consumed in large quantities.\n\n**Harmful substances**\n- Salt: High salt content can lead to high blood pressure and other cardiovascular issues if consumed excessively.\n- Saturated Fat: High levels of saturated fat can increase the risk of heart disease." },
+
+        new ExamplesInfo { Name = "Whole Milk", HostedImageUrl = "https://images.openfoodfacts.org/images/products/501/226/200/4011/ingredients_en.8.full.jpg",
+            Ingredients = "**Ingredients**\nWhole milk (60%), whipping cream (21%), sugar, milk solids, glycerine, emulsifier (mono- and diglycerides of fatty acids), pasteurised free range eggs, stabilisers (sodium alginate and guar gum).\n\n**Nutritional Values**\nNot Found",
+            Result ="**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product is high in whole milk, cream, and sugar, which means it has a lot of fat and sugar, making it unhealthy if consumed in large amounts. The presence of emulsifiers and stabilizers, while not necessarily harmful, indicates processed ingredients.\n\n**Harmful substances**\nNone of the listed ingredients are known allergens or cancer-causing substances, but the high sugar and fat content can contribute to health issues like obesity and heart disease if consumed excessively." },
+
+        new ExamplesInfo { Name = "Frankfurt sausages", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/044/800/1002/ingredients_es.9.full.jpg",
+            Ingredients = "**Ingredients**\nPork meat 86% (origin Spain), water, salt, spices, stabilizer: di- and polyphosphates, dextrose, antioxidant: ascorbic acid, preservative: sodium nitrite.\n\n**Nutritional Values**\nNot Found",
+            Result = "**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product contains a high percentage of pork meat, but it also includes additives like stabilizers, preservatives, and dextrose, which are not ideal for health. Sodium nitrite, in particular, is a preservative that has been linked to health concerns.\n\n**Harmful substances**\n- Sodium nitrite: This preservative can form nitrosamines, which are compounds that have been linked to an increased risk of cancer."}
+    };
+    private void ScrollToTop()
+    {
+        JSRuntime.InvokeVoidAsync("scrollToTop");
+    }
+    private async Task UpdateExample(string key)
+    {
+        var example = Examples.Find(e => e.Name == key);
+        if (example != null)
+        {
+            HostedImageUrl = example.HostedImageUrl;
+            Ingredients = example.Ingredients;
+            Result = example.Result;
+        }
+        await InvokeAsync(() => this.StateHasChanged());
+    }
+}
+@code {
+
+
     public TemporaryConfig temporaryConfig { get; set; } = new TemporaryConfig();
 
     public string HostedImageUrl { get; set; } = string.Empty;
@@ -252,7 +340,7 @@
             var folderPath = Path.Combine("wwwroot", "temp");
             if (Directory.Exists(folderPath))
             {
-                // Delete existing images 
+                // Delete existing images
                 Array.ForEach(Directory.GetFiles(folderPath), File.Delete);
             }
             else
@@ -301,7 +389,7 @@
         Ingredients = string.Empty;
         await InvokeAsync(() => this.StateHasChanged());
 
-        if (!Uri.IsWellFormedUriString(ImageUrl, UriKind.Absolute))
+        if (!Uri.IsWellFormedUriString(ImageUrl, UriKind.Absolute) && !Uri.IsWellFormedUriString(HostedImageUrl, UriKind.Absolute))
         {
             errorMessage = "Invalid URL";
             isProcessingIngredients = false;
