@@ -1,0 +1,463 @@
+﻿@page "/"
+@using FoodHealthChecker.Components.Layout
+@using FoodHealthChecker
+@using FoodHealthChecker.Models
+@using Markdig
+@using Microsoft.AspNetCore.Components
+@using System.Runtime.CompilerServices
+@using System.Text.Json
+@using Microsoft.SemanticKernel
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+
+@implements IDisposable
+<PageTitle> Food Health Checker</PageTitle>
+@{
+    var showClass = isPopupVisible ? "d-block" : "d-none";
+}
+
+<div class="container mt-2">
+    <div class="d-flex justify-content-between gap-2">
+        <h3 class="card-title mb-2 fw-bold text-start">AI Food Health Checker</h3>
+        <div>
+            @if (!string.IsNullOrEmpty(duplicateSpace))
+            {
+                <a class="card-title mb-2 fw-bold btn btn-dark me-2" href="@duplicateSpace" target="_blank">Duplicate this space</a>
+            }
+            <button @onclick="OpenModal" class="card-title mb-2 fw-bold btn btn-dark">Add Temporary Config</button>
+        </div>
+    </div>
+
+    <!-- temporaryConfig Modal -->
+    <div class="modal @showClass" tabindex="-1" role="dialog" id="temporaryConfigModal">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Add Temporary Config (Any one)</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@temporaryConfig" OnSubmit="SubmitForm" FormName="Configs">
+                        <div class="form-section">
+                            <h5 class="fw-bold">Azure OpenAI</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="AzureOpenAI_DeploymentName" class="form-label">Deployment Name</label>
+                                    <InputText class="form-control" id="AzureOpenAI_DeploymentName" @bind-Value="temporaryConfig.AzureOpenAI_DeploymentName" placeholder="Enter Deployment Name" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="AzureOpenAI_Endpoint" class="form-label">Endpoint</label>
+                                    <InputText class="form-control" id="AzureOpenAI_Endpoint" @bind-Value="temporaryConfig.AzureOpenAI_Endpoint" placeholder="Enter Endpoint" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="AzureOpenAI_ApiKey" class="form-label">API Key</label>
+                                    <InputText type="password" class="form-control" id="AzureOpenAI_ApiKey" @bind-Value="temporaryConfig.AzureOpenAI_ApiKey" placeholder="Enter API Key" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h5 class="fw-bold">OpenAI</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="OpenAI_ModelId" class="form-label">Model ID</label>
+                                    <InputText class="form-control" id="OpenAI_ModelId" @bind-Value="temporaryConfig.OpenAI_ModelId" placeholder="Enter Model ID" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="OpenAI_ApiKey" class="form-label">API Key</label>
+                                    <InputText class="form-control" type="password" id="OpenAI_ApiKey" @bind-Value="temporaryConfig.OpenAI_ApiKey" placeholder="Enter API Key" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center ">
+        <div class="col-xl-12">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-0">@errorMessage</div>
+            }
+        </div>
+        <div class="col-xl-4">
+            <div class="card common-card-height">
+                <div class="card-body">
+                    <h4 class="card-title fw-bold  text-start">Add/Upload Image </h4>
+                    <div class="form-group mb-3">
+                        <InputText class="form-control" @bind-Value="HostedImageUrl" id="hostedimageUrl" placeholder="Hosted Image URL" />
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <!-- HTML -->
+                        <label for="upload-image" class="custom-upload-button btn btn-primary @isUploadingImage">
+                            Upload Image
+                        </label>
+                        <InputFile OnChange="HandleSelectedFiles" accept=".jpg,.png" class="btn btn-primary" id="upload-image" aria-describedby="fileHelp"></InputFile>
+                    </div>
+                    <div class="form-group mb-3">
+                        <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse || isProcessingIngredients)">Check Health</button>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(HostedImageUrl))
+                    {
+                        <img src="@HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
+                    }
+                    else if (!string.IsNullOrWhiteSpace(ImageUrl))
+                    {
+                        <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
+                    }
+                    else if (!string.IsNullOrWhiteSpace(isUploadingImage))
+                    {
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-8">
+            <div class="card common-card-height">
+                <div class="card-body">
+                    <h4 class="card-title text-start ">Food Contents</h4>
+                    @if (isProcessingIngredients)
+                    {
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-lg-start ai-ingredients-response">
+                            @((MarkupString)Markdig.Markdown.ToHtml(Ingredients, pipeline))
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row justify-content-center mt-2">
+        <div class="col-xl-12">
+            <div class="card ">
+                <div class="card-body">
+                    <h4 class="card-title text-start">Final Verdict</h4>
+                    @if (isProcessingResponse)
+                    {
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-lg-start ai-response">
+                            @((MarkupString)Markdown.ToHtml(Result, pipeline))
+                        </p>
+                    }
+                </div>
+            </div>
+            <div class="alert alert-warning text-center fw-bold mb-0" role="alert">
+                Warning: The content generated by AI can be inaccurate.
+            </div>
+        </div>
+    </div>
+    <div class="row mt-2">
+        <div class="col-xl-12">
+            <div class="card">
+                <div class="card-body overflow-auto">
+                    <h3 class="fw-bold text-start">Examples</h3>
+                    <table class="table custom-table">
+                        <thead>
+                            <tr>
+                                <th>Names</th>
+                                <th>Images</th>
+                                <th>Results</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var example in Examples)
+                            {
+                                <tr>
+                                    <td><a href="@example.HostedImageUrl" target="_blank">@example.Name </a></td>
+                                    <td><img src="@example.HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 150px; max-width: 150px" /></td>
+                                    <td>
+                                        <button class="btn btn-primary" @onclick="async () => {await UpdateExample(example.Name); ScrollToTop(); }">
+                                            See Results
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function scrollToTop() {
+        document.documentElement.scrollTop = 0;
+    }
+</script>
+@code {
+    public class ExamplesInfo
+    {
+        public string Name { get; set; }
+        public string HostedImageUrl { get; set; }
+        public string Ingredients { get; set; }
+        public string Result { get; set; }
+    }
+
+    public List<ExamplesInfo> Examples = new List<ExamplesInfo>()
+    {
+        new ExamplesInfo { Name = "Milk chocolate", HostedImageUrl = "https://images.openfoodfacts.org/images/products/762/220/173/0253/ingredients_en.5.full.jpg",
+            Ingredients ="**Ingredients**\nMilk Chocolate (Sugar, Milk Solids, Cocoa Butter, Cocoa Mass, Emulsifiers (Soy Lecithin, E476), Flavourings)\n\n**Nutritional Values**\n- Serving Size: 1 bar (approx. 21g)\n- Energy: 110 kcal\n- Protein: 1.3g\n- Carbohydrates: 12.7g\n  - Sugars: 12.5g\n- Fat: 6.1g\n  - Saturated Fat: 3.7g\n- Fiber: 0.2g\n- Sodium: 20mg",
+            Result = "**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product is high in sugar and saturated fat, which can contribute to weight gain and heart problems if consumed in large amounts. It also has very little fiber and protein, making it less nutritious overall.\n\n**Harmful substances**\n- **Sugar**: High sugar content can lead to tooth decay, obesity, and increased risk of type 2 diabetes.\n- **Saturated Fat**: High levels of saturated fat can raise cholesterol levels and increase the risk of heart disease.\n- **Soy Lecithin**: Common allergen for those with soy allergies." },
+
+
+        new ExamplesInfo { Name = "Bacon", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/048/607/8035/ingredients_es.29.full.jpg",
+            Ingredients = "**Ingredients**\nMechanically separated chicken meat, pork fat, water, salt, dextrose, stabilizers (E-466, E-508, E-450), flavors and spices, smoke flavor, antioxidant (E-316), preservative (E-250). May contain traces of soy and milk protein.\n\n**Nutritional Values**\nNot Found",
+            Result ="**Predicted Rating**\nVery Unhealthy\n\n**Reasoning**\nThis product contains high amounts of processed meats, fats, and additives like preservatives and stabilizers, which are not good for your health if consumed regularly. It also lacks any nutritional information, making it hard to assess its overall health benefits.\n\n**Harmful substances**\n- E-250 (Sodium Nitrite): Can form cancer-causing compounds called nitrosamines.\n- Mechanically separated meat: Often contains higher levels of fat and may have bone fragments.\n- May contain traces of soy and milk protein: Common allergens." },
+
+        new ExamplesInfo { Name = "High Protein Chicken & Chorizo Paella", HostedImageUrl = "https://images.openfoodfacts.org/images/products/505/590/422/3289/front_en.3.full.jpg",
+            Ingredients ="**Ingredients**\nChicken breast and chorizo pieces in a rich paella sauce with rice, garden peas, semi dried cherry tomatoes and diced red peppers.\n\n**Nutritional Values**\nEnergy: 1919 kJ / 460 kcal\nFat: 20.19g\nSaturated Fat: 4.2g\nSugar: 6.8g\nSalt: 1.799g",
+            Result = "**Predicted Rating**\nModerately Healthy\n\n**Reasoning**\nThis dish contains a good mix of protein from chicken breast and chorizo, along with vegetables like peas, tomatoes, and peppers. However, it has a relatively high fat content, especially saturated fat, and a significant amount of salt, which can be concerning if consumed in large quantities.\n\n**Harmful substances**\n- Salt: High salt content can lead to high blood pressure and other cardiovascular issues if consumed excessively.\n- Saturated Fat: High levels of saturated fat can increase the risk of heart disease." },
+
+        new ExamplesInfo { Name = "Whole Milk", HostedImageUrl = "https://images.openfoodfacts.org/images/products/501/226/200/4011/ingredients_en.8.full.jpg",
+            Ingredients = "**Ingredients**\nWhole milk (60%), whipping cream (21%), sugar, milk solids, glycerine, emulsifier (mono- and diglycerides of fatty acids), pasteurised free range eggs, stabilisers (sodium alginate and guar gum).\n\n**Nutritional Values**\nNot Found",
+            Result ="**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product is high in whole milk, cream, and sugar, which means it has a lot of fat and sugar, making it unhealthy if consumed in large amounts. The presence of emulsifiers and stabilizers, while not necessarily harmful, indicates processed ingredients.\n\n**Harmful substances**\nNone of the listed ingredients are known allergens or cancer-causing substances, but the high sugar and fat content can contribute to health issues like obesity and heart disease if consumed excessively." },
+
+        new ExamplesInfo { Name = "Frankfurt sausages", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/044/800/1002/ingredients_es.9.full.jpg",
+            Ingredients = "**Ingredients**\nPork meat 86% (origin Spain), water, salt, spices, stabilizer: di- and polyphosphates, dextrose, antioxidant: ascorbic acid, preservative: sodium nitrite.\n\n**Nutritional Values**\nNot Found",
+            Result = "**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product contains a high percentage of pork meat, but it also includes additives like stabilizers, preservatives, and dextrose, which are not ideal for health. Sodium nitrite, in particular, is a preservative that has been linked to health concerns.\n\n**Harmful substances**\n- Sodium nitrite: This preservative can form nitrosamines, which are compounds that have been linked to an increased risk of cancer."}
+    };
+    private void ScrollToTop()
+    {
+        JSRuntime.InvokeVoidAsync("scrollToTop");
+    }
+    private async Task UpdateExample(string key)
+    {
+        var example = Examples.Find(e => e.Name == key);
+        if (example != null)
+        {
+            HostedImageUrl = example.HostedImageUrl;
+            Ingredients = example.Ingredients;
+            Result = example.Result;
+        }
+        await InvokeAsync(() => this.StateHasChanged());
+    }
+}
+@code {
+
+
+    public TemporaryConfig temporaryConfig { get; set; } = new TemporaryConfig();
+
+    public string HostedImageUrl { get; set; } = string.Empty;
+    public string ImageUrl { get; set; } = string.Empty;
+    public ReadOnlyMemory<byte> ImageData { get; set; }
+    public string ImageName { get; set; } = string.Empty;
+    public string Ingredients { get; set; } = string.Empty;
+    public string Result { get; set; } = string.Empty;
+
+    [Inject]
+    public MarkdownPipeline pipeline { get; set; } = default!;
+    [Inject]
+    public FoodCheckerService _foodCheckerService { get; set; } = default!;
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+    [Inject]
+    private IConfiguration Config { get; set; } = default!;
+
+    private bool isPopupVisible = false;
+    private bool isProcessingIngredients = false;
+    private bool isProcessingResponse = false;
+    private string isUploadingImage = string.Empty;
+    private string errorMessage = string.Empty;
+    private string duplicateSpace = string.Empty;
+    private CancellationTokenSource _cts = new CancellationTokenSource();
+
+    private async Task OpenModal()
+    {
+        isPopupVisible = true;
+        await InvokeAsync(() => this.StateHasChanged());
+    }
+
+    private async Task CloseModal()
+    {
+        isPopupVisible = false;
+        await InvokeAsync(() => this.StateHasChanged());
+    }
+
+    private async Task SubmitForm()
+    {
+        try
+        {
+            if (!(temporaryConfig.isAzureOpenAIConfigValid() || temporaryConfig.isOpenAIConfigValid()))
+            {
+                errorMessage = "Invalid Config";
+            }
+            else
+            {
+                errorMessage = string.Empty;
+                _foodCheckerService.UpdateTemporaryKernel(temporaryConfig);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Unexpected Error occured";
+        }
+        await CloseModal();
+    }
+
+
+    protected override void OnInitialized()
+    {
+        duplicateSpace = Config.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
+        if (!_foodCheckerService.IsValid())
+        {
+            errorMessage = "API keys missing from config";
+        }
+    }
+
+
+    private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
+    {
+        ImageUrl = string.Empty;
+        errorMessage = string.Empty;
+        isUploadingImage = "disabled";
+        var imageFile = e.File;
+        await InvokeAsync(() => this.StateHasChanged());
+        if (imageFile != null)
+        {
+            // Ensure the TempImages folder exists and is empty
+            var folderPath = Path.Combine("wwwroot", "temp");
+            if (Directory.Exists(folderPath))
+            {
+                // Delete existing images
+                Array.ForEach(Directory.GetFiles(folderPath), File.Delete);
+            }
+            else
+            {
+                // Create the directory if it does not exist
+                Directory.CreateDirectory(folderPath);
+            }
+
+            // Save the file to the server
+            var filePath = Path.Combine(folderPath, imageFile.Name);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await imageFile.OpenReadStream().CopyToAsync(stream);
+            }
+
+            // Read the file into a byte array
+            ImageData = await ReadFileBytes(imageFile);
+            ImageName = imageFile.Name;
+
+            // Update the ImageUrl property with the complete URL
+            var relativePath = Path.Combine("temp", imageFile.Name);
+            ImageUrl = Navigation.ToAbsoluteUri(relativePath).ToString();
+        }
+        isUploadingImage = string.Empty;
+        await InvokeAsync(() => this.StateHasChanged());
+    }
+
+    private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
+    {
+        using var memoryStream = new MemoryStream();
+        await imageFile.OpenReadStream().CopyToAsync(memoryStream);
+        return memoryStream.ToArray();
+    }
+
+    private async Task CheckHealth()
+    {
+        if (!_foodCheckerService.IsValid())
+        {
+            errorMessage = "API keys missing from config";
+            return;
+        }
+        isProcessingIngredients = true;
+        isProcessingResponse = true;
+        errorMessage = string.Empty;
+        Result = string.Empty;
+        Ingredients = string.Empty;
+        await InvokeAsync(() => this.StateHasChanged());
+
+        if (!Uri.IsWellFormedUriString(ImageUrl, UriKind.Absolute) && !Uri.IsWellFormedUriString(HostedImageUrl, UriKind.Absolute))
+        {
+            errorMessage = "Invalid URL";
+            isProcessingIngredients = false;
+            isProcessingResponse = false;
+            await InvokeAsync(() => this.StateHasChanged());
+            return;
+        }
+        try
+        {
+            string selectedImgUrl = !string.IsNullOrWhiteSpace(HostedImageUrl) ? HostedImageUrl : ImageUrl;
+            await foreach (var response in _foodCheckerService.GetIngredirentsAsync(selectedImgUrl, _cts.Token))
+            {
+                isProcessingIngredients = false;
+                Ingredients += response;
+                await InvokeAsync(() => this.StateHasChanged());
+            }
+            if (Ingredients == "<|ERROR|>")
+            {
+                Ingredients = Ingredients.Replace("<|ERROR|>", "Not Found");
+                errorMessage = "Failed to get ingredients";
+            }
+            else
+            {
+                if (Ingredients.Contains("<|ERROR|>"))
+                {
+                    Ingredients = Ingredients.Replace("<|ERROR|>", "Not Found");
+                }
+                await InvokeAsync(() => this.StateHasChanged());
+
+                await foreach (var response in _foodCheckerService.CheckFoodHealthAsync(Ingredients, _cts.Token))
+                {
+                    isProcessingResponse = false;
+                    Result += response;
+                    await InvokeAsync(() => this.StateHasChanged());
+                }
+            }
+        }
+        catch (HttpOperationException hEx)
+        {
+            if (hEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                errorMessage = "Rate Limit Exceeded. Please try again Later";
+            }
+            else if (hEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                using JsonDocument doc = JsonDocument.Parse(hEx.ResponseContent);
+                JsonElement root = doc.RootElement;
+                string message = root.GetProperty("error").GetProperty("message").GetString();
+                Console.WriteLine(message);
+                errorMessage = message;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            errorMessage = "Error: An unexpected error has occurred";
+        }
+        finally
+        {
+            isProcessingResponse = false;
+            isProcessingIngredients = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+}

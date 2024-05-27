@@ -11,11 +11,11 @@ app_port: 8080
 
 ## FoodHealthChecker
 
-An app that lists all the ingredients and nutritional info present in the images and predicts whether it is healthy or not.
+This is an C# blazor server app app that lists all the ingredients and nutritional info present in a given food products and predicts whether it is healthy or not.
 
-Build using .Net Semantic Kernel and Azure OpenAI/OpenAI Gpt-4-vision model.
+Build using .Net with the Semantic Kernel SDK and Azure OpenAI/OpenAI models.
 
-**NOTE Running this Repo locally requires either an Azure OpenAI endpoint or an OpenAI APIKey present in the app settings to function properly**
+**NOTE Running this app requires either an Azure OpenAI endpoint or an OpenAI APIKey present in the app settings to function properly.**
 
 
 
