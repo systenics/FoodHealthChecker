@@ -1,6 +1,5 @@
 ﻿@page "/"
 @using FoodHealthChecker.Components.Layout
-@using FoodHealthChecker
 @using FoodHealthChecker.Models
 @using Markdig
 @using Microsoft.AspNetCore.Components
@@ -9,9 +8,9 @@
 @using Microsoft.SemanticKernel
 @rendermode InteractiveServer
 @inject IJSRuntime JSRuntime
-
-
+@inject IConfiguration Configuration
 @implements IDisposable
+
 <PageTitle> Food Health Checker</PageTitle>
 @{
     var showClass = isPopupVisible ? "d-block" : "d-none";
@@ -25,7 +24,7 @@
             {
                 <a class="card-title mb-2 fw-bold btn btn-dark me-2" href="@duplicateSpace" target="_blank">Duplicate this space</a>
             }
-            <button @onclick="OpenModal" class="card-title mb-2 fw-bold btn btn-dark">Add Temporary Config</button>
+            <button @onmousedown="OpenModalPopup" class="card-title mb-2 fw-bold btn btn-dark">Add Temporary Config</button>
         </div>
     </div>
 
@@ -35,10 +34,10 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold">Add Temporary Config (Any one)</h5>
-                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    <button type="button" class="btn-close" @onclick="CloseModalPopup"></button>
                 </div>
                 <div class="modal-body">
-                    <EditForm Model="@temporaryConfig" OnSubmit="SubmitForm" FormName="Configs">
+                    <EditForm Model="@temporaryConfig" OnSubmit="SubmitPopupForm" FormName="Configs">
                         <div class="form-section">
                             <h5 class="fw-bold">Azure OpenAI</h5>
                             <div class="row">
@@ -207,62 +206,67 @@
     }
 </script>
 @code {
-    public class ExamplesInfo
-    {
-        public string Name { get; set; }
-        public string HostedImageUrl { get; set; }
-        public string Ingredients { get; set; }
-        public string Result { get; set; }
-    }
 
-    public List<ExamplesInfo> Examples = new List<ExamplesInfo>()
+    public static List<Examples> Examples = new List<Examples>()
     {
-        new ExamplesInfo { Name = "Milk chocolate", HostedImageUrl = "https://images.openfoodfacts.org/images/products/762/220/173/0253/ingredients_en.5.full.jpg",
+        new Examples { Name = "Milk chocolate", HostedImageUrl = "https://images.openfoodfacts.org/images/products/762/220/173/0253/ingredients_en.5.full.jpg",
             Ingredients ="**Ingredients**\nMilk Chocolate (Sugar, Milk Solids, Cocoa Butter, Cocoa Mass, Emulsifiers (Soy Lecithin, E476), Flavourings)\n\n**Nutritional Values**\n- Serving Size: 1 bar (approx. 21g)\n- Energy: 110 kcal\n- Protein: 1.3g\n- Carbohydrates: 12.7g\n  - Sugars: 12.5g\n- Fat: 6.1g\n  - Saturated Fat: 3.7g\n- Fiber: 0.2g\n- Sodium: 20mg",
             Result = "**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product is high in sugar and saturated fat, which can contribute to weight gain and heart problems if consumed in large amounts. It also has very little fiber and protein, making it less nutritious overall.\n\n**Harmful substances**\n- **Sugar**: High sugar content can lead to tooth decay, obesity, and increased risk of type 2 diabetes.\n- **Saturated Fat**: High levels of saturated fat can raise cholesterol levels and increase the risk of heart disease.\n- **Soy Lecithin**: Common allergen for those with soy allergies." },
 
-
-        new ExamplesInfo { Name = "Bacon", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/048/607/8035/ingredients_es.29.full.jpg",
+        new Examples { Name = "Bacon", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/048/607/8035/ingredients_es.29.full.jpg",
             Ingredients = "**Ingredients**\nMechanically separated chicken meat, pork fat, water, salt, dextrose, stabilizers (E-466, E-508, E-450), flavors and spices, smoke flavor, antioxidant (E-316), preservative (E-250). May contain traces of soy and milk protein.\n\n**Nutritional Values**\nNot Found",
             Result ="**Predicted Rating**\nVery Unhealthy\n\n**Reasoning**\nThis product contains high amounts of processed meats, fats, and additives like preservatives and stabilizers, which are not good for your health if consumed regularly. It also lacks any nutritional information, making it hard to assess its overall health benefits.\n\n**Harmful substances**\n- E-250 (Sodium Nitrite): Can form cancer-causing compounds called nitrosamines.\n- Mechanically separated meat: Often contains higher levels of fat and may have bone fragments.\n- May contain traces of soy and milk protein: Common allergens." },
 
-        new ExamplesInfo { Name = "High Protein Chicken & Chorizo Paella", HostedImageUrl = "https://images.openfoodfacts.org/images/products/505/590/422/3289/front_en.3.full.jpg",
+        new Examples { Name = "High Protein Chicken & Chorizo Paella", HostedImageUrl = "https://images.openfoodfacts.org/images/products/505/590/422/3289/front_en.3.full.jpg",
             Ingredients ="**Ingredients**\nChicken breast and chorizo pieces in a rich paella sauce with rice, garden peas, semi dried cherry tomatoes and diced red peppers.\n\n**Nutritional Values**\nEnergy: 1919 kJ / 460 kcal\nFat: 20.19g\nSaturated Fat: 4.2g\nSugar: 6.8g\nSalt: 1.799g",
             Result = "**Predicted Rating**\nModerately Healthy\n\n**Reasoning**\nThis dish contains a good mix of protein from chicken breast and chorizo, along with vegetables like peas, tomatoes, and peppers. However, it has a relatively high fat content, especially saturated fat, and a significant amount of salt, which can be concerning if consumed in large quantities.\n\n**Harmful substances**\n- Salt: High salt content can lead to high blood pressure and other cardiovascular issues if consumed excessively.\n- Saturated Fat: High levels of saturated fat can increase the risk of heart disease." },
 
-        new ExamplesInfo { Name = "Whole Milk", HostedImageUrl = "https://images.openfoodfacts.org/images/products/501/226/200/4011/ingredients_en.8.full.jpg",
+        new Examples { Name = "Whole Milk", HostedImageUrl = "https://images.openfoodfacts.org/images/products/501/226/200/4011/ingredients_en.8.full.jpg",
             Ingredients = "**Ingredients**\nWhole milk (60%), whipping cream (21%), sugar, milk solids, glycerine, emulsifier (mono- and diglycerides of fatty acids), pasteurised free range eggs, stabilisers (sodium alginate and guar gum).\n\n**Nutritional Values**\nNot Found",
             Result ="**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product is high in whole milk, cream, and sugar, which means it has a lot of fat and sugar, making it unhealthy if consumed in large amounts. The presence of emulsifiers and stabilizers, while not necessarily harmful, indicates processed ingredients.\n\n**Harmful substances**\nNone of the listed ingredients are known allergens or cancer-causing substances, but the high sugar and fat content can contribute to health issues like obesity and heart disease if consumed excessively." },
 
-        new ExamplesInfo { Name = "Frankfurt sausages", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/044/800/1002/ingredients_es.9.full.jpg",
+        new Examples { Name = "Frankfurt sausages", HostedImageUrl = "https://images.openfoodfacts.org/images/products/841/044/800/1002/ingredients_es.9.full.jpg",
             Ingredients = "**Ingredients**\nPork meat 86% (origin Spain), water, salt, spices, stabilizer: di- and polyphosphates, dextrose, antioxidant: ascorbic acid, preservative: sodium nitrite.\n\n**Nutritional Values**\nNot Found",
             Result = "**Predicted Rating**\nUnhealthy\n\n**Reasoning**\nThis product contains a high percentage of pork meat, but it also includes additives like stabilizers, preservatives, and dextrose, which are not ideal for health. Sodium nitrite, in particular, is a preservative that has been linked to health concerns.\n\n**Harmful substances**\n- Sodium nitrite: This preservative can form nitrosamines, which are compounds that have been linked to an increased risk of cancer."}
     };
+
+    /// <summary>
+    /// Invokes a JavaScript function to scroll the view to the top.
+    /// </summary>
     private void ScrollToTop()
     {
         JSRuntime.InvokeVoidAsync("scrollToTop");
     }
-    private async Task UpdateExample(string key)
+
+    /// <summary>
+    /// Updates the example based on the provided example name.
+    /// If the example is found, it updates the HostedImageUrl, Ingredients, and Result properties and triggers a UI refresh.
+    /// </summary>
+    /// <param name="exampleName">The name of the example to update.</param>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
+    private async Task UpdateExample(string exampleName)
     {
-        var example = Examples.Find(e => e.Name == key);
+        var example = Examples.Find(e => e.Name == exampleName);
         if (example != null)
         {
             HostedImageUrl = example.HostedImageUrl;
             Ingredients = example.Ingredients;
             Result = example.Result;
+            await InvokeAsync(() => this.StateHasChanged());
         }
-        await InvokeAsync(() => this.StateHasChanged());
     }
 }
-@code {
 
+@code {
 
     public TemporaryConfig temporaryConfig { get; set; } = new TemporaryConfig();
 
     public string HostedImageUrl { get; set; } = string.Empty;
+
     public string ImageUrl { get; set; } = string.Empty;
     public ReadOnlyMemory<byte> ImageData { get; set; }
     public string ImageName { get; set; } = string.Empty;
+
     public string Ingredients { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
 
@@ -272,34 +276,46 @@
     public FoodCheckerService _foodCheckerService { get; set; } = default!;
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
-    [Inject]
-    private IConfiguration Config { get; set; } = default!;
 
     private bool isPopupVisible = false;
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;
     private string isUploadingImage = string.Empty;
+
     private string errorMessage = string.Empty;
     private string duplicateSpace = string.Empty;
+
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
-    private async Task OpenModal()
+    /// <summary>
+    /// Opens the temporay config modal popup and triggers a UI refresh.
+    /// </summary>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
+    private async Task OpenModalPopup()
     {
         isPopupVisible = true;
         await InvokeAsync(() => this.StateHasChanged());
     }
 
-    private async Task CloseModal()
+    /// <summary>
+    /// Closes the temporary config modal popup and triggers a UI refresh.
+    /// </summary>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
+    private async Task CloseModalPopup()
     {
         isPopupVisible = false;
         await InvokeAsync(() => this.StateHasChanged());
     }
 
-    private async Task SubmitForm()
+    /// <summary>
+    /// Submits the temporary config form, validates the configuration, updates the temporary kernel if valid, and closes the popup.
+    /// </summary>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
+    private async Task SubmitPopupForm()
     {
         try
         {
-            if (!(temporaryConfig.isAzureOpenAIConfigValid() || temporaryConfig.isOpenAIConfigValid()))
+            if (!(temporaryConfig.IsAzureOpenAIConfigValid() || temporaryConfig.IsOpenAIConfigValid()))
             {
                 errorMessage = "Invalid Config";
             }
@@ -311,22 +327,29 @@
         }
         catch (Exception ex)
         {
+            Console.WriteLine(ex.Message);
             errorMessage = "Unexpected Error occured";
         }
-        await CloseModal();
+        await CloseModalPopup();
     }
 
-
+    /// <summary>
+    /// Initializes the component, checks the validity of the service, and sets the error message if invalid.
+    /// </summary>
     protected override void OnInitialized()
     {
-        duplicateSpace = Config.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
+        duplicateSpace = Configuration.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
         if (!_foodCheckerService.IsValid())
         {
             errorMessage = "API keys missing from config";
         }
     }
 
-
+    /// <summary>
+    /// Handles the selected files, uploads the image, and updates the UI.
+    /// </summary>
+    /// <param name="e">The event arguments.</param>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
     private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
     {
         ImageUrl = string.Empty;
@@ -368,6 +391,11 @@
         await InvokeAsync(() => this.StateHasChanged());
     }
 
+    /// <summary>
+    /// Reads the file bytes from the provided image file.
+    /// </summary>
+    /// <param name="imageFile">The image file to read.</param>
+    /// <returns>A Task that represents the asynchronous operation and contains the file bytes.</returns>
     private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
     {
         using var memoryStream = new MemoryStream();
@@ -375,6 +403,10 @@
         return memoryStream.ToArray();
     }
 
+    /// <summary>
+    /// Get the ingredients and final results of the uploaded image and updates the UI.
+    /// </summary>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
     private async Task CheckHealth()
     {
         if (!_foodCheckerService.IsValid())
@@ -454,10 +486,12 @@
         }
     }
 
+    /// <summary>
+    /// Disposes the component by cancelling and disposing the CancellationTokenSource.
+    /// </summary>
     public void Dispose()
     {
         _cts.Cancel();
         _cts.Dispose();
     }
-
 }
