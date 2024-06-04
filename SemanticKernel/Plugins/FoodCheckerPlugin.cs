@@ -17,16 +17,22 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
 
         private readonly KernelFunction _checkFoodHealthFunction;
 
-        [Description("The food health checker analyze the given image and check if they are healthy or not")]
         public FoodCheckerPlugin()
         {
             _checkFoodHealthFunction = KernelFunctionFactory.CreateFromPrompt(
                 FoodCheckerTemplates.CheckFoodHealth,
-                description: "Given the list of ingredients classfiy whether the Nutri-score and Nova-group along with the reasons in simpler terms\r\n",
+                description: "Given the list of ingredients for a food product give it a Rating from Very Unhealthy to very Healthy.",
                 executionSettings: s_settings);
         }
 
-        [KernelFunction, Description("Given the list of ingredients classfiy whether the Nutri-score and Nova-group along with the reasons in simpler term")]
+        /// <summary>
+        /// Checks the healthiness of food based on the given list of ingredients and nutritional values.
+        /// </summary>
+        /// <param name="input">List of ingredients and nutritional values</param>
+        /// <param name="kernel">Kernel for the function</param>
+        /// <param name="cancellationToken">the cancellation token</param>
+        /// <returns>Generated text about the healthiness of the food</returns>
+        [KernelFunction, Description("Given the list of ingredients for a food product give it a Rating from Very Unhealthy to very Healthy.")]
         public async IAsyncEnumerable<string> CheckFoodHealthAsync([Description("List of ingredients and nutritional values")] string input, Kernel kernel, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             await foreach (var result in _checkFoodHealthFunction.InvokeStreamingAsync(kernel, new(s_settings) { { "input", input } }, cancellationToken))
@@ -37,12 +43,19 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
             }
         }
 
+        /// <summary>
+        /// Gets the ingredients and nutritional values from the given food product images.
+        /// </summary>
+        /// <param name="input">URL of the food ingredients image</param>
+        /// <param name="kernel">Kernel for the function</param>
+        /// <param name="cancellationToken">the cancellation token</param>
+        /// <returns>Generated text about the ingredients and nutritional values of the food</returns>
         [KernelFunction, Description("Get the ingredients and nutritional values from the given food product images")]
         public async IAsyncEnumerable<string> GetIngredientsAsync([Description("Food ingredients image url")] string input, Kernel kernel, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var chatService = kernel.GetRequiredService<IChatCompletionService>();
 
-            ChatHistory chat = new ChatHistory(FoodCheckerTemplates.SystemMessage);
+            ChatHistory chat = new(FoodCheckerTemplates.SystemMessage);
             chat.AddUserMessage(new ChatMessageContentItemCollection
             {
                 new TextContent(FoodCheckerTemplates.GetIngredients),
@@ -56,10 +69,18 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
             }
         }
     }
+
     public static class FoodCheckerTemplates
     {
         public const string SystemMessage = @"You are an AI Food expert with extensive knowledge in Nutrion";
 
+        public const string GetIngredients =
+@"
+[Instruction]    
+Get the ingredients and nutritional values in english from the given food product images as briefly as possible in the given format else respond with <|ERROR|> if nothing if found
+[RESPONSE]
+**Ingredients**
+**Nutritional Values**";
         public const string CheckFoodHealth =
 @"
 [Instruction]    
@@ -72,14 +93,6 @@ Also list any allergens, cancer causing or harmful substances if present along w
 **Reasoning**
 **Harmful substances**
 ";
-
-        public const string GetIngredients =
-@"
-[Instruction]    
-Get the ingredients and nutritional values in english from the given food product images as briefly as possible in the given format else respond with <|ERROR|> if nothing if found
-[RESPONSE]
-**Ingredients**
-**Nutritional Values**";
 
     }
 }
