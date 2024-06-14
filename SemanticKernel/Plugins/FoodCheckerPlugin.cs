@@ -51,16 +51,20 @@ namespace FoodHealthChecker.SemanticKernel.Plugins
         /// <param name="cancellationToken">the cancellation token</param>
         /// <returns>Generated text about the ingredients and nutritional values of the food</returns>
         [KernelFunction, Description("Get the ingredients and nutritional values from the given food product images")]
-        public async IAsyncEnumerable<string> GetIngredientsAsync([Description("Food ingredients image url")] string input, Kernel kernel, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async IAsyncEnumerable<string> GetIngredientsAsync([Description("List of Food ingredients image url")] List<string> input, Kernel kernel, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var chatService = kernel.GetRequiredService<IChatCompletionService>();
 
             ChatHistory chat = new(FoodCheckerTemplates.SystemMessage);
-            chat.AddUserMessage(new ChatMessageContentItemCollection
+            var msgCollection = new ChatMessageContentItemCollection
             {
                 new TextContent(FoodCheckerTemplates.GetIngredients),
-                new ImageContent(new Uri(input,UriKind.Absolute))
-            });
+            };
+            foreach(var imgurl in input)
+            {
+                msgCollection.Add(new ImageContent(new Uri(imgurl, UriKind.Absolute)));
+            }
+            chat.AddUserMessage(msgCollection);
             await foreach (var result in chatService.GetStreamingChatMessageContentsAsync(chat, s_settings, kernel, cancellationToken))
             {
                 var generatedText = result?.ToString() ?? string.Empty;

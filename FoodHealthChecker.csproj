@@ -5,9 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	  <NoWarn>SKEXP0001</NoWarn>
+	  <ContainerRepository>foodhealthchecker</ContainerRepository>
 	  <UserSecretsId>34c9f77b-3416-42fc-90bc-2e0503b55215</UserSecretsId>
-	  <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-	  <DockerfileContext>.</DockerfileContext>
+	  <DockerContext>../..</DockerContext>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,13 +15,31 @@
     <Compile Remove="SemanticKernel\Filters\FoodCheckPromptRenderFilter.cs" />
     <Compile Remove="SemanticKernel\Plugins\FoodCheckerFilterPlugin.cs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="appsettings.Development.json" />
+  </ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Markdig" Version="0.37.0" />
 		<PackageReference Include="Microsoft.SemanticKernel" Version="1.12.0" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.20.1" />
+		<PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.5.0" />
+		<PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="8.0.1" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.8.1" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.8.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.8.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.8.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.8.1" />
 	</ItemGroup>
 	<ItemGroup>
+	  <Folder Include="Properties\PublishProfiles\" />
 	  <Folder Include="SemanticKernel\Filters\" />
 	  <Folder Include="wwwroot\temp\" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Reference Include="Systenics.ServiceDefaults">
+	    <HintPath>References\Systenics.ServiceDefaults.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+
 </Project>

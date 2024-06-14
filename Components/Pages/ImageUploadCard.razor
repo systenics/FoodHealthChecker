@@ -1,0 +1,37 @@
+﻿@* ImageUploadCard.razor *@
+<div class="col-xl-6">
+    <h4 class="card-title fw-bold text-center">@Title</h4>
+    <div class="form-group mb-3">
+        <label for="@this.GetHashCode()" class="custom-upload-button btn btn-primary @IsUploadingImage">
+            Upload Image
+        </label>
+        <InputFile OnChange="@HandleFile" accept=".jpg,.png" class="btn btn-primary upload-image" id="@this.GetHashCode()" aria-describedby="fileHelp"></InputFile>
+        <div class="mt-3">
+            @if (!string.IsNullOrWhiteSpace(ImageUrl))
+            {
+                <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
+            }
+            else if (!string.IsNullOrWhiteSpace(IsUploadingImage))
+            {
+                <div class="d-flex justify-content-center">
+                    <div class="spinner-border text-primary" role="status">
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public string ImageUrl { get; set; }
+
+    [Parameter]
+    public string IsUploadingImage { get; set; }
+
+    [Parameter]
+    public EventCallback<InputFileChangeEventArgs> HandleFile { get; set; }
+}

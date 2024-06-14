@@ -3,14 +3,20 @@
 @using FoodHealthChecker.Models
 @using Markdig
 @using Microsoft.AspNetCore.Components
+@using FoodHealthChecker.Components.Pages
 @using System.Runtime.CompilerServices
 @using System.Text.Json
 @using Microsoft.SemanticKernel
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using System.Security.Cryptography
+@using System.Net.Http.Headers
+@inject ProtectedLocalStorage ProtectedLocalStore
 @rendermode InteractiveServer
 @inject IJSRuntime JSRuntime
 @inject IConfiguration Configuration
 @implements IDisposable
-
+@inject HttpClient httpClient
+@using Microsoft.AspNetCore.SignalR;
 <PageTitle> Food Health Checker</PageTitle>
 @{
     var showClass = isPopupVisible ? "d-block" : "d-none";
@@ -37,7 +43,7 @@
                     <button type="button" class="btn-close" @onclick="CloseModalPopup"></button>
                 </div>
                 <div class="modal-body">
-                    <EditForm Model="@temporaryConfig" OnSubmit="SubmitPopupForm" FormName="Configs">
+                    <EditForm Model="@temporaryConfig" OnSubmit="SubmitPopupForm" FormName="Configs" >
                         <div class="form-section">
                             <h5 class="fw-bold">Azure OpenAI</h5>
                             <div class="row">
@@ -84,44 +90,24 @@
                 <div class="alert alert-danger mt-0">@errorMessage</div>
             }
         </div>
-        <div class="col-xl-4">
-            <div class="card common-card-height">
-                <div class="card-body">
-                    <h4 class="card-title fw-bold  text-start">Add/Upload Image </h4>
-                    <div class="form-group mb-3">
-                        <InputText class="form-control" @bind-Value="HostedImageUrl" id="hostedimageUrl" placeholder="Hosted Image URL" />
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <!-- HTML -->
-                        <label for="upload-image" class="custom-upload-button btn btn-primary @isUploadingImage">
-                            Upload Image
-                        </label>
-                        <InputFile OnChange="HandleSelectedFiles" accept=".jpg,.png" class="btn btn-primary" id="upload-image" aria-describedby="fileHelp"></InputFile>
-                    </div>
-                    <div class="form-group mb-3">
-                        <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse || isProcessingIngredients)">Check Health</button>
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(HostedImageUrl))
-                    {
-                        <img src="@HostedImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
-                    }
-                    else if (!string.IsNullOrWhiteSpace(ImageUrl))
-                    {
-                        <img src="@ImageUrl" alt="Preview Image" class="img-fluid rounded" style="max-height: 120px;" />
-                    }
-                    else if (!string.IsNullOrWhiteSpace(isUploadingImage))
-                    {
-                        <div class="d-flex justify-content-center">
-                            <div class="spinner-border text-primary" role="status">
+        <div class="col-xl-6 mb-2">
+            <div class="card ">
+                <div class="card-body common-card-height">
+                    <div class="row">
+                        <ImageUploadCard Title="Ingredients" ImageUrl="@IngredientsImageUrl" IsUploadingImage="@isUploadingIngredientsImage" HandleFile="HandleIngredientFile" />
+                        <ImageUploadCard Title="Nutritional values" ImageUrl="@NutritonalImageUrl" IsUploadingImage="@isUploadingNutritionalImage" HandleFile="HandleNutritionalFile" />
+                        <div class="col-xl-12">
+                            <div class="form-group mb-3">
+                                <button class="btn btn-primary w-100" @onclick="CheckHealth" disabled="@(isProcessingResponse || isProcessingIngredients)">Check Health</button>
                             </div>
                         </div>
-                    }
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-xl-8">
+
+
+        <div class="col-xl-6">
             <div class="card common-card-height">
                 <div class="card-body">
                     <h4 class="card-title text-start ">Food Contents</h4>
@@ -134,7 +120,7 @@
                     }
                     else
                     {
-                        <p class="text-lg-start ai-ingredients-response">
+                        <p class="text-start ai-ingredients-response">
                             @((MarkupString)Markdig.Markdown.ToHtml(Ingredients, pipeline))
                         </p>
                     }
@@ -156,7 +142,7 @@
                     }
                     else
                     {
-                        <p class="text-lg-start ai-response">
+                        <p class="text-start ai-response">
                             @((MarkupString)Markdown.ToHtml(Result, pipeline))
                         </p>
                     }
@@ -249,7 +235,7 @@
         var example = Examples.Find(e => e.Name == exampleName);
         if (example != null)
         {
-            HostedImageUrl = example.HostedImageUrl;
+            IngredientsImageUrl = example.HostedImageUrl;
             Ingredients = example.Ingredients;
             Result = example.Result;
             await InvokeAsync(() => this.StateHasChanged());
@@ -258,14 +244,15 @@
 }
 
 @code {
-
+    const int MAX_IMAGE_UPLOADSIZE = 10120000;
     public TemporaryConfig temporaryConfig { get; set; } = new TemporaryConfig();
 
-    public string HostedImageUrl { get; set; } = string.Empty;
+    // public string HostedImageUrl { get; set; } = string.Empty;
 
-    public string ImageUrl { get; set; } = string.Empty;
-    public ReadOnlyMemory<byte> ImageData { get; set; }
-    public string ImageName { get; set; } = string.Empty;
+    public string IngredientsImageUrl { get; set; } = string.Empty;
+    public string NutritonalImageUrl { get; set; } = string.Empty;
+    private string isUploadingIngredientsImage = string.Empty;
+    private string isUploadingNutritionalImage = string.Empty;
 
     public string Ingredients { get; set; } = string.Empty;
     public string Result { get; set; } = string.Empty;
@@ -280,7 +267,7 @@
     private bool isPopupVisible = false;
     private bool isProcessingIngredients = false;
     private bool isProcessingResponse = false;
-    private string isUploadingImage = string.Empty;
+
 
     private string errorMessage = string.Empty;
     private string duplicateSpace = string.Empty;
@@ -322,7 +309,7 @@
             else
             {
                 errorMessage = string.Empty;
-                _foodCheckerService.UpdateTemporaryKernel(temporaryConfig);
+                await _foodCheckerService.UpdateTemporaryKernel(temporaryConfig, ProtectedLocalStore);
             }
         }
         catch (Exception ex)
@@ -336,13 +323,40 @@
     /// <summary>
     /// Initializes the component, checks the validity of the service, and sets the error message if invalid.
     /// </summary>
-    protected override void OnInitialized()
+    protected override async void OnInitialized()
     {
         duplicateSpace = Configuration.GetValue<string>("HFDuplicateSpace") ?? string.Empty;
+
+
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        //Try set kernel using Local storage if the Configs are missing
+        if (firstRender && !_foodCheckerService.IsValid())
+        {
+            await _foodCheckerService.CheckBrowserStorage(ProtectedLocalStore);
+        }
         if (!_foodCheckerService.IsValid())
         {
             errorMessage = "API keys missing from config";
+            await InvokeAsync(() => this.StateHasChanged());
+
         }
+    }
+    /// <summary>
+    /// Handles the selected files, uploads the image, and updates the UI.
+    /// </summary>
+    /// <param name="e">The event arguments.</param>
+    /// <returns>A Task that represents the asynchronous operation.</returns>
+    private async Task HandleIngredientFile(InputFileChangeEventArgs e)
+    {
+        errorMessage = string.Empty;
+        IngredientsImageUrl = string.Empty;
+        isUploadingIngredientsImage = "disabled";
+        await InvokeAsync(() => this.StateHasChanged());
+        IngredientsImageUrl = await HandleImage(e.File);
+        isUploadingIngredientsImage = string.Empty;
+        await InvokeAsync(() => this.StateHasChanged());
     }
 
     /// <summary>
@@ -350,58 +364,102 @@
     /// </summary>
     /// <param name="e">The event arguments.</param>
     /// <returns>A Task that represents the asynchronous operation.</returns>
-    private async Task HandleSelectedFiles(InputFileChangeEventArgs e)
+    private async Task HandleNutritionalFile(InputFileChangeEventArgs e)
     {
-        ImageUrl = string.Empty;
         errorMessage = string.Empty;
-        isUploadingImage = "disabled";
-        var imageFile = e.File;
+        NutritonalImageUrl = string.Empty;
+        isUploadingNutritionalImage = "disabled";
         await InvokeAsync(() => this.StateHasChanged());
-        if (imageFile != null)
+        NutritonalImageUrl = await HandleImage(e.File);
+        isUploadingNutritionalImage = string.Empty;
+        await InvokeAsync(() => this.StateHasChanged());
+
+    }
+    //Slow handle image 
+    private async Task<string> HandleImage(IBrowserFile imageFile)
+    {
+        try
         {
+
+            if (imageFile == null)
+            {
+                errorMessage = "Error: Image Upload failed";
+                return string.Empty;
+            }
             // Ensure the TempImages folder exists and is empty
             var folderPath = Path.Combine("wwwroot", "temp");
-            if (Directory.Exists(folderPath))
+            if (!Directory.Exists(folderPath))
             {
-                // Delete existing images
-                Array.ForEach(Directory.GetFiles(folderPath), File.Delete);
-            }
-            else
-            {
-                // Create the directory if it does not exist
                 Directory.CreateDirectory(folderPath);
             }
-
             // Save the file to the server
-            var filePath = Path.Combine(folderPath, imageFile.Name);
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await imageFile.OpenReadStream().CopyToAsync(stream);
-            }
-
-            // Read the file into a byte array
-            ImageData = await ReadFileBytes(imageFile);
-            ImageName = imageFile.Name;
-
+            var fileName = string.Concat(Guid.NewGuid().ToString(), Path.GetExtension(imageFile.Name));
+            var filePath = Path.Combine(folderPath, fileName);
+            // using (var stream = new FileStream(filePath, FileMode.Create))
+            // {
+            //     await imageFile.OpenReadStream(MAX_IMAGE_UPLOADSIZE).CopyToAsync(stream);
+            // }
+            await using FileStream stream = new(filePath, FileMode.Create);
+            await imageFile.OpenReadStream(MAX_IMAGE_UPLOADSIZE).CopyToAsync(stream);
             // Update the ImageUrl property with the complete URL
-            var relativePath = Path.Combine("temp", imageFile.Name);
-            ImageUrl = Navigation.ToAbsoluteUri(relativePath).ToString();
+            var relativePath = Path.Combine("temp", fileName);
+            return Navigation.ToAbsoluteUri(relativePath).ToString();
+
         }
-        isUploadingImage = string.Empty;
-        await InvokeAsync(() => this.StateHasChanged());
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            errorMessage = "Error: Image Upload failed";
+            return string.Empty;
+        }
     }
 
+    //Handle image fix try 
+    // private async Task<string> HandleImage(IBrowserFile imageFile)
+    // {
+    //     try
+    //     {
+    //         if (imageFile == null)
+    //         {
+    //             errorMessage = "Error: Image Upload failed";
+    //             return string.Empty;
+    //         }
+    //         // Save the file to the server
+    //         var fileName = string.Concat(Guid.NewGuid().ToString(), Path.GetExtension(imageFile.Name));
+
+    //         var uri = Path.Combine(Navigation.BaseUri,"image/upload");
+    //         using var content = new MultipartFormDataContent();
+    //         var fileContent = new StreamContent(imageFile.OpenReadStream(MAX_IMAGE_UPLOADSIZE));
+    //         fileContent.Headers.ContentType = new MediaTypeHeaderValue(imageFile.ContentType);
+    //         content.Add(fileContent, "file", fileName);
+            
+    //         await httpClient.PostAsync(uri, content);
+    //         var relativePath = Path.Combine("temp", fileName);
+
+    //         // Update the ImageUrl property with the complete URL
+    //         return Navigation.ToAbsoluteUri(relativePath).ToString();
+
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine(ex.Message);
+    //         errorMessage = "Error: Image Upload failed";
+    //         return string.Empty;
+    //     }
+    // }
+
+
     /// <summary>
-    /// Reads the file bytes from the provided image file.
+    /// Reads the file bytes from the provided image file. for dataURi 
     /// </summary>
     /// <param name="imageFile">The image file to read.</param>
     /// <returns>A Task that represents the asynchronous operation and contains the file bytes.</returns>
-    private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
-    {
-        using var memoryStream = new MemoryStream();
-        await imageFile.OpenReadStream().CopyToAsync(memoryStream);
-        return memoryStream.ToArray();
-    }
+    // private async Task<ReadOnlyMemory<byte>> ReadFileBytes(IBrowserFile imageFile)
+    // {
+    //     using var memoryStream = new MemoryStream();
+    //     await imageFile.OpenReadStream(MAX_IMAGE_UPLOADSIZE).CopyToAsync(memoryStream);
+    //     return memoryStream.ToArray();
+    // }
 
     /// <summary>
     /// Get the ingredients and final results of the uploaded image and updates the UI.
@@ -421,9 +479,9 @@
         Ingredients = string.Empty;
         await InvokeAsync(() => this.StateHasChanged());
 
-        if (!Uri.IsWellFormedUriString(ImageUrl, UriKind.Absolute) && !Uri.IsWellFormedUriString(HostedImageUrl, UriKind.Absolute))
+        if (!Uri.IsWellFormedUriString(IngredientsImageUrl, UriKind.Absolute) && !Uri.IsWellFormedUriString(NutritonalImageUrl, UriKind.Absolute))
         {
-            errorMessage = "Invalid URL";
+            errorMessage = "Images missing. Atleast one image is required";
             isProcessingIngredients = false;
             isProcessingResponse = false;
             await InvokeAsync(() => this.StateHasChanged());
@@ -431,8 +489,17 @@
         }
         try
         {
-            string selectedImgUrl = !string.IsNullOrWhiteSpace(HostedImageUrl) ? HostedImageUrl : ImageUrl;
-            await foreach (var response in _foodCheckerService.GetIngredirentsAsync(selectedImgUrl, _cts.Token))
+            List<string> imageUrls = new List<string>();
+            if (!string.IsNullOrWhiteSpace(IngredientsImageUrl))
+            {
+                imageUrls.Add(IngredientsImageUrl);
+            }
+            if (!string.IsNullOrWhiteSpace(NutritonalImageUrl))
+            {
+                imageUrls.Add(NutritonalImageUrl);
+            }
+            // string selectedImgUrl = !string.IsNullOrWhiteSpace(HostedImageUrl) ? HostedImageUrl : IngredientsImageUrl;
+            await foreach (var response in _foodCheckerService.GetIngredirentsAsync(imageUrls, _cts.Token))
             {
                 isProcessingIngredients = false;
                 Ingredients += response;
@@ -461,7 +528,17 @@
         }
         catch (HttpOperationException hEx)
         {
-            if (hEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            Console.WriteLine(hEx.Message);
+            if(hEx.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                errorMessage = "The given model or endpoint was not found. Check your config and try again";
+
+            }
+            if (hEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                errorMessage = "Access denied due to invalid  key or wrong API endpoint.";
+            }
+            else if (hEx.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
                 errorMessage = "Rate Limit Exceeded. Please try again Later";
             }
@@ -473,6 +550,12 @@
                 Console.WriteLine(message);
                 errorMessage = message;
             }
+            else
+            {
+                errorMessage = "AN unexpected error has occured. Try again later";
+            }
+            await InvokeAsync(() => this.StateHasChanged());
+
         }
         catch (Exception ex)
         {

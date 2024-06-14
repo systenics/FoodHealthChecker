@@ -1,7 +1,10 @@
 ﻿using FoodHealthChecker.Models;
 using FoodHealthChecker.Options;
 using FoodHealthChecker.SemanticKernel.Plugins;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.SemanticKernel;
+using System.Security.Cryptography;
+
 
 namespace FoodHealthChecker
 {
@@ -58,12 +61,12 @@ namespace FoodHealthChecker
         /// <summary>
         /// Gets the ingredients asynchronously for the given hosted image url
         /// </summary>
-        /// <param name="hostedImageUrl">The image URL.</param>
+        /// <param name="imageUrlList">The image URL.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>return the ingredients text present in the given imageUrl</returns>
-        public IAsyncEnumerable<string> GetIngredirentsAsync(string hostedImageUrl, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<string> GetIngredirentsAsync(List<string> imageUrlList, CancellationToken cancellationToken = default)
         {
-            return _foodCheckerPlugin.GetIngredientsAsync(hostedImageUrl, _kernel, cancellationToken);
+            return _foodCheckerPlugin.GetIngredientsAsync(imageUrlList, _kernel, cancellationToken);
         }
 
         /// <summary>
@@ -75,29 +78,34 @@ namespace FoodHealthChecker
         /// <returns>return the ingredients text present in the given image</returns>
         public IAsyncEnumerable<string> GetIngredirentsAsync(ReadOnlyMemory<byte> imageData, string fileName, CancellationToken cancellationToken = default)
         {
-
             var imageDataUrl = new ImageContent(imageData) { MimeType = GetMimeType(fileName) }.ToString();
-
-            return _foodCheckerPlugin.GetIngredientsAsync(imageDataUrl, _kernel, cancellationToken);
+            return _foodCheckerPlugin.GetIngredientsAsync(new List<string>() { imageDataUrl }, _kernel, cancellationToken);
         }
 
         /// <summary>
         /// Updates the kernel using temporary Config set through UI
         /// </summary>
         /// <param name="config">The temporary configuration passed</param>
-        public void UpdateTemporaryKernel(TemporaryConfig config)
+        public async Task UpdateTemporaryKernel(TemporaryConfig config, ProtectedLocalStorage localStorage)
         {
             var kernelBuilder = Kernel.CreateBuilder();
-
-            if (config.IsAzureOpenAIConfigValid())
+            bool isExpired = await config.TryDeleteLocalStorage(localStorage);
+            if (!isExpired)
             {
-                kernelBuilder.AddAzureOpenAIChatCompletion(config.AzureOpenAI_DeploymentName, config.AzureOpenAI_Endpoint, config.AzureOpenAI_ApiKey);
-                isValid = true;
+                if (config.IsAzureOpenAIConfigValid())
+                {
+                    kernelBuilder.AddAzureOpenAIChatCompletion(config.AzureOpenAI_DeploymentName, config.AzureOpenAI_Endpoint, config.AzureOpenAI_ApiKey);
+                    isValid = true;
+                }
+                else if (config.IsOpenAIConfigValid())
+                {
+                    kernelBuilder.AddOpenAIChatCompletion(config.OpenAI_ModelId, config.OpenAI_ApiKey);
+                    isValid = true;
+                }
             }
-            else if (config.IsOpenAIConfigValid())
+            if (isValid)
             {
-                kernelBuilder.AddOpenAIChatCompletion(config.OpenAI_ModelId, config.OpenAI_ApiKey);
-                isValid = true;
+                await localStorage.SetAsync("TemporaryConfig", config);
             }
             var kernel = kernelBuilder.Build();
             kernel.Plugins.AddFromObject(_foodCheckerPlugin);
@@ -124,6 +132,26 @@ namespace FoodHealthChecker
                 ".svg" => "image/svg+xml",
                 _ => throw new NotSupportedException("Unsupported image format.")
             };
+        }
+        public async Task CheckBrowserStorage(ProtectedLocalStorage localStorage)
+        {
+            try
+            {
+                var tempConfig = await localStorage.GetAsync<TemporaryConfig>("TemporaryConfig");
+                if (tempConfig.Value != null)
+                {
+                    await UpdateTemporaryKernel(tempConfig.Value, localStorage);
+                }
+            }
+            catch (CryptographicException crEx)
+            {
+                // Delete previous inaccessible keys 
+                await localStorage.DeleteAsync("TempoaryConfig");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
         }
     }
 }

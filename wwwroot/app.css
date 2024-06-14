@@ -87,7 +87,11 @@ h4 {
     color: white;
 }
 .common-card-height {
-    height: 400px;
+    min-height: 400px;
+    height: -moz-available; /* For Firefox */
+    height: -webkit-fit-content; /* For Chrome, Safari, etc. */
+    height: fit-content; /* Standard syntax */
+    max-height: fit-content;
 }  
 /* color-related.css */
 
@@ -175,7 +179,7 @@ h1, h2, h3, h4, h5, h6 {
         background-color: rgba(0,0,0,0.5);
     }
 
-#upload-image {
+.upload-image {
     opacity: 0;
     position: absolute;
     z-index: -1;
